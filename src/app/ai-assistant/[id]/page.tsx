@@ -5,6 +5,7 @@ import { AppSidebar } from "../components/app-sidebar";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { TelegramConnect } from "@/components/ui/TelegramConnect";
+import { GoogleCalendarConnect } from "@/components/ui/GoogleCalendarConnect";
 import {
   SidebarInset,
   SidebarProvider,
@@ -35,6 +36,7 @@ import {
   Square,
 } from "lucide-react";
 import { useUserInfo } from "@/hooks/useUserInfo";
+import { useLocation } from "@/hooks/useLocation";
 import { cn } from "@/lib/utils";
 import { useKeyVault } from "@/components/ui/useKeyVault";
 import { KeyManagerDialog } from "@/components/ui/KeyManager";
@@ -117,6 +119,21 @@ function saveVoiceAssistantPreference(chatId: string, value: boolean) {
   localStorage.setItem(getVoiceAssistantStorageKey(chatId), value ? "1" : "0");
 }
 
+function getSupportedAudioMimeType() {
+  if (typeof window === "undefined" || !("MediaRecorder" in window)) {
+    return "";
+  }
+
+  const mimeTypes = [
+    "audio/webm;codecs=opus",
+    "audio/webm",
+    "audio/mp4",
+    "audio/mpeg",
+  ];
+
+  return mimeTypes.find((mimeType) => MediaRecorder.isTypeSupported(mimeType)) ?? "";
+}
+
 async function loadChatFromDB(chatId: string) {
   const res = await fetch(`/api/chats/${chatId}/messages`, {
     credentials: "include",
@@ -161,6 +178,7 @@ export default function Page() {
   const router = useRouter();
   const { user, loading } = useUserInfo();
   const { keys } = useKeyVault();
+  const { location: currentLocation, error: locationError, loading: locationLoading, requestLocation } = useLocation();
 
   const [mode, setMode] = useState<AIMode>("server-key");
   const [selectedModel, setSelectedModel] = useState("google/gemini-2.5-flash");
@@ -183,6 +201,10 @@ export default function Page() {
   const [voiceSidebarExpanded, setVoiceSidebarExpanded] = useState(false);
   const [writeCommitState, setWriteCommitState] = useState<WriteCommitStateMap>({});
   const recognitionRef = useRef<any>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const mediaChunksRef = useRef<Blob[]>([]);
+  const useServerSpeechRecognitionRef = useRef(true);
   const speechQueueRef = useRef<Array<{ messageId: string; text: string }>>([]);
   const isSpeechActiveRef = useRef(false);
   const spokenCursorByMessageRef = useRef<Record<string, number>>({});
@@ -500,6 +522,149 @@ export default function Page() {
     [queueSpeechChunk, voiceAssistantEnabled],
   );
 
+  const cleanupMediaRecording = useCallback(() => {
+    mediaRecorderRef.current = null;
+    mediaChunksRef.current = [];
+
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+      mediaStreamRef.current = null;
+    }
+  }, []);
+
+  const handleRecognizedVoiceText = useCallback((text: string) => {
+    const trimmedText = text.trim();
+    if (!trimmedText) return;
+
+    if (voiceAssistantEnabledRef.current) {
+      setLastSentTranscript(trimmedText);
+      setLiveTranscript("");
+      void sendRef.current(trimmedText, selectedModelRef.current, modeRef.current, true);
+      return;
+    }
+
+    setInput((prev) => (prev ? `${prev} ${trimmedText}` : trimmedText));
+    setLiveTranscript("");
+  }, []);
+
+  const transcribeRecordedAudio = useCallback(
+    async (audioBlob: Blob) => {
+      if (audioBlob.size < 800) {
+        setLiveTranscript("");
+        toast.error("No speech detected. Try speaking a little louder.");
+        return;
+      }
+
+      setLiveTranscript("Transcribing...");
+
+      const formData = new FormData();
+      const extension = audioBlob.type.includes("mp4")
+        ? "mp4"
+        : audioBlob.type.includes("mpeg")
+          ? "mp3"
+          : "webm";
+      formData.append("audio", audioBlob, `voice-input.${extension}`);
+
+      const response = await fetch("/api/ai/voice/transcribe", {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(
+          typeof data?.error === "string" ? data.error : "Voice transcription failed.",
+        );
+      }
+
+      const transcript = typeof data?.text === "string" ? data.text.trim() : "";
+      if (!transcript) {
+        setLiveTranscript("");
+        toast.error("No speech detected. Try speaking a little louder.");
+        return;
+      }
+
+      handleRecognizedVoiceText(transcript);
+    },
+    [handleRecognizedVoiceText],
+  );
+
+  const startServerSpeechRecognition = useCallback(async () => {
+    if (
+      typeof navigator === "undefined" ||
+      !navigator.mediaDevices?.getUserMedia ||
+      typeof window === "undefined" ||
+      !("MediaRecorder" in window)
+    ) {
+      toast.error("Voice input is not available in this browser.");
+      return;
+    }
+
+    try {
+      stopSpeechPlayback();
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = getSupportedAudioMimeType();
+      const recorder = mimeType
+        ? new MediaRecorder(stream, { mimeType })
+        : new MediaRecorder(stream);
+
+      mediaStreamRef.current = stream;
+      mediaRecorderRef.current = recorder;
+      mediaChunksRef.current = [];
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          mediaChunksRef.current.push(event.data);
+        }
+      };
+
+      recorder.onstop = () => {
+        const chunks = mediaChunksRef.current;
+        const type = recorder.mimeType || mimeType || "audio/webm";
+        cleanupMediaRecording();
+        setIsRecording(false);
+
+        void transcribeRecordedAudio(new Blob(chunks, { type })).catch((error: any) => {
+          setLiveTranscript("");
+          toast.error(error?.message ?? "Voice transcription failed.");
+        });
+      };
+
+      recorder.onerror = () => {
+        cleanupMediaRecording();
+        setIsRecording(false);
+        setLiveTranscript("");
+        toast.error("Voice recording failed. Check microphone permissions and try again.");
+      };
+
+      recorder.start();
+      setIsRecording(true);
+      setLiveTranscript("Listening...");
+    } catch (error: any) {
+      cleanupMediaRecording();
+      setIsRecording(false);
+      setLiveTranscript("");
+      toast.error(
+        error?.message ?? "Could not start voice input. Check microphone permissions.",
+      );
+    }
+  }, [cleanupMediaRecording, stopSpeechPlayback, transcribeRecordedAudio]);
+
+  const stopServerSpeechRecognition = useCallback(() => {
+    const recorder = mediaRecorderRef.current;
+    if (!recorder) return;
+
+    if (recorder.state === "recording" || recorder.state === "paused") {
+      recorder.stop();
+      return;
+    }
+
+    cleanupMediaRecording();
+    setIsRecording(false);
+  }, [cleanupMediaRecording]);
+
   /* Initialize Web Speech API */
   useEffect(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -529,9 +694,7 @@ export default function Page() {
         !recognitionHadErrorRef.current &&
         finalText.length > 0
       ) {
-        setLastSentTranscript(finalText);
-        setLiveTranscript("");
-        void sendRef.current(finalText, selectedModelRef.current, modeRef.current, true);
+        handleRecognizedVoiceText(finalText);
       }
 
       finalVoiceTranscriptRef.current = "";
@@ -570,13 +733,43 @@ export default function Page() {
       console.error("Speech recognition error", event.error);
       recognitionHadErrorRef.current = true;
       setIsRecording(false);
-      toast.error(
-        event?.error === "not-allowed"
-          ? "Microphone permission was blocked. Allow mic access and try again."
-          : event?.error === "no-speech"
-            ? "No speech detected. Try speaking a little louder."
-            : "Voice input failed to start."
-      );
+      
+      let errorMessage = "Voice input failed.";
+      let shouldUseServerFallback = false;
+      
+      switch (event?.error) {
+        case "not-allowed":
+          errorMessage = "Microphone permission was blocked. Allow mic access and try again.";
+          break;
+        case "no-speech":
+          errorMessage = "No speech detected. Try speaking a little louder.";
+          break;
+        case "network":
+          errorMessage = "Browser speech recognition is unavailable. Switching to server transcription.";
+          shouldUseServerFallback = true;
+          break;
+        case "service-not-allowed":
+          errorMessage = "Speech recognition service is not available in your region.";
+          break;
+        case "bad-grammar":
+          errorMessage = "Speech recognition configuration error.";
+          break;
+        case "language-not-supported":
+          errorMessage = "The selected language is not supported for speech recognition.";
+          break;
+        case "aborted":
+          errorMessage = "Speech recognition was cancelled.";
+          break;
+        default:
+          errorMessage = `Voice input error: ${event?.error || "Unknown error"}`;
+      }
+      
+      toast.error(errorMessage);
+
+      if (shouldUseServerFallback) {
+        useServerSpeechRecognitionRef.current = true;
+        void startServerSpeechRecognition();
+      }
     };
 
     recognitionRef.current = recognition;
@@ -585,12 +778,29 @@ export default function Page() {
       if (recognitionRef.current) {
         recognitionRef.current.abort();
       }
+      cleanupMediaRecording();
     };
-  }, [stopSpeechPlayback]);
+  }, [
+    cleanupMediaRecording,
+    handleRecognizedVoiceText,
+    startServerSpeechRecognition,
+    stopSpeechPlayback,
+  ]);
 
   const toggleVoiceInput = useCallback(() => {
+    if (mediaRecorderRef.current) {
+      stopServerSpeechRecognition();
+      return;
+    }
+
+    if (useServerSpeechRecognitionRef.current) {
+      void startServerSpeechRecognition();
+      return;
+    }
+
     if (!recognitionRef.current) {
-      toast.error("Voice input is not available in this browser.");
+      useServerSpeechRecognitionRef.current = true;
+      void startServerSpeechRecognition();
       return;
     }
 
@@ -607,11 +817,11 @@ export default function Page() {
       } catch (error: any) {
         console.error("Failed to start speech recognition", error);
         toast.error(
-          error?.message ?? "Could not start voice input. Check microphone permissions."
+          error?.message ?? "Could not start voice input. Check microphone permissions and internet connection."
         );
       }
     }
-  }, [isRecording, stopSpeechPlayback]);
+  }, [isRecording, startServerSpeechRecognition, stopServerSpeechRecognition, stopSpeechPlayback]);
 
   useEffect(() => {
     if (!isRecording && speechQueueRef.current.length > 0 && !isSpeechActiveRef.current) {
@@ -694,9 +904,14 @@ export default function Page() {
           body: {
             ...body,
             id,
-            messages:messages.slice(-12),
+            messages,
             trigger,
             messageId,
+            currentLocation: currentLocation ? {
+              latitude: currentLocation.latitude,
+              longitude: currentLocation.longitude,
+              address: currentLocation.address,
+            } : undefined,
           },
         };
       },
@@ -886,11 +1101,6 @@ export default function Page() {
     const { provider } = parseModelValue(selectedModel);
     const userApiKey = keys[provider];
 
-    const telegramChatId =
-      typeof window !== "undefined"
-        ? localStorage.getItem("telegramChatId")
-        : null;
-
     sendMessage(
       { text },
       {
@@ -900,7 +1110,6 @@ export default function Page() {
           userApiKey,
           chatId,
           voiceAssistantEnabled: effectiveVoiceAssistantEnabled,
-          telegramChatId,
         },
       },
     );
@@ -1219,8 +1428,9 @@ export default function Page() {
         renderHeaderContent()
       ) : null}
 
-      <div className="border-b px-4 py-3">
+      <div className="grid gap-3 border-b px-4 py-3 md:grid-cols-2">
         <TelegramConnect />
+        <GoogleCalendarConnect />
       </div>
 
       <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
@@ -1296,7 +1506,9 @@ export default function Page() {
               onStop={() => {
                 stop();
                 stopSpeechPlayback();
-                if (recognitionRef.current && isRecording) {
+                if (mediaRecorderRef.current) {
+                  stopServerSpeechRecognition();
+                } else if (recognitionRef.current && isRecording) {
                   try {
                     recognitionRef.current.stop();
                   } catch {

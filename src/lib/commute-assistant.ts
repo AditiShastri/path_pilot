@@ -1,4 +1,5 @@
 import { mockEvents } from "@/lib/mock-events";
+import { getTravelEstimate } from "@/lib/routes";
 
 type TravelMode = "METRO" | "CAB" | "AUTO" | "TRANSIT";
 
@@ -10,12 +11,18 @@ interface ModeEstimate {
   cost: string;
   notes: string;
   score: number;
+  bookingUrl?: string;
 }
 
 interface CommutePlanOptions {
   message: string;
   destination?: string;
   origin?: string;
+  currentLocation?: {
+    latitude: number;
+    longitude: number;
+    address?: string;
+  };
   requestedStartTime?: string;
   action?: "plan" | "create_event" | "book_cab" | "book_auto" | "book_metro";
 }
@@ -40,9 +47,10 @@ function formatTime(date: Date) {
   }).format(date);
 }
 
-function getMockModeEstimates(destination: string): ModeEstimate[] {
+function getModeEstimates(destination: string, roadTrafficEstimate?: any): ModeEstimate[] {
   const normalizedDestination = normalize(destination);
 
+  // For MG Road - keep existing mock data
   if (normalizedDestination.includes("mg road")) {
     return [
       {
@@ -53,6 +61,7 @@ function getMockModeEstimates(destination: string): ModeEstimate[] {
         cost: "Rs. 60",
         notes: "Fastest and most predictable for MG Road; short walk from the station.",
         score: 95,
+        bookingUrl: "https://www.bmrc.co.in/",
       },
       {
         mode: "CAB",
@@ -62,6 +71,7 @@ function getMockModeEstimates(destination: string): ModeEstimate[] {
         cost: "Rs. 420",
         notes: "Door-to-door, but traffic around MG Road can be slow.",
         score: 78,
+        bookingUrl: "https://www.olacabs.com/",
       },
       {
         mode: "AUTO",
@@ -71,6 +81,7 @@ function getMockModeEstimates(destination: string): ModeEstimate[] {
         cost: "Rs. 260",
         notes: "Flexible, but less comfortable for longer stretches.",
         score: 72,
+        bookingUrl: "https://www.uber.com/in/en/ride/",
       },
       {
         mode: "TRANSIT",
@@ -80,10 +91,12 @@ function getMockModeEstimates(destination: string): ModeEstimate[] {
         cost: "Rs. 90",
         notes: "Budget option with more waiting time.",
         score: 66,
+        bookingUrl: "https://www.redbus.in/",
       },
     ];
   }
 
+  // For Electronic City - keep existing mock data
   if (normalizedDestination.includes("electronic city")) {
     return [
       {
@@ -92,8 +105,9 @@ function getMockModeEstimates(destination: string): ModeEstimate[] {
         duration: "58 mins",
         distance: "25 km",
         cost: "Rs. 680",
-        notes: "Best door-to-door option for Electronic City in this mock setup.",
+        notes: "Best door-to-door option for Electronic City.",
         score: 88,
+        bookingUrl: "https://www.olacabs.com/",
       },
       {
         mode: "AUTO",
@@ -103,6 +117,7 @@ function getMockModeEstimates(destination: string): ModeEstimate[] {
         cost: "Rs. 430",
         notes: "Possible, but a long auto ride.",
         score: 62,
+        bookingUrl: "https://www.uber.com/in/en/ride/",
       },
       {
         mode: "TRANSIT",
@@ -112,6 +127,7 @@ function getMockModeEstimates(destination: string): ModeEstimate[] {
         cost: "Rs. 120",
         notes: "Cheapest, but slowest and transfer-heavy.",
         score: 58,
+        bookingUrl: "https://www.redbus.in/",
       },
       {
         mode: "METRO",
@@ -119,50 +135,62 @@ function getMockModeEstimates(destination: string): ModeEstimate[] {
         duration: "1 hr 35 mins",
         distance: "28 km",
         cost: "Rs. 80",
-        notes: "Not ideal in this mock route because the last-mile leg is long.",
+        notes: "Not ideal because the last-mile leg is long.",
         score: 54,
+        bookingUrl: "https://www.bmrc.co.in/",
       },
     ];
   }
 
-  return [
+  // For any other location, use real routing data or generic estimates
+  const baseEstimates: ModeEstimate[] = [
     {
       mode: "CAB",
-      durationMinutes: 45,
-      duration: "45 mins",
-      distance: "14 km",
+      durationMinutes: roadTrafficEstimate?.duration ? parseInt(roadTrafficEstimate.duration.split(' ')[0]) : 45,
+      duration: roadTrafficEstimate?.duration || "45 mins",
+      distance: roadTrafficEstimate?.distance || "14 km",
       cost: "Rs. 400",
-      notes: "Generic mock cab estimate for unknown destinations.",
+      notes: roadTrafficEstimate?.source === "tomtom" 
+        ? `Real-time estimate. Traffic delay: ${roadTrafficEstimate.trafficDelay || "0 mins"}.`
+        : "Generic cab estimate for this destination.",
       score: 80,
+      bookingUrl: "https://www.olacabs.com/",
     },
     {
       mode: "AUTO",
-      durationMinutes: 52,
-      duration: "52 mins",
-      distance: "14 km",
+      durationMinutes: roadTrafficEstimate?.duration ? parseInt(roadTrafficEstimate.duration.split(' ')[0]) : 52,
+      duration: roadTrafficEstimate?.duration || "52 mins",
+      distance: roadTrafficEstimate?.distance || "14 km",
       cost: "Rs. 250",
-      notes: "Generic mock auto estimate for unknown destinations.",
+      notes: roadTrafficEstimate?.source === "tomtom"
+        ? `Real-time estimate. Traffic delay: ${roadTrafficEstimate.trafficDelay || "0 mins"}.`
+        : "Generic auto estimate for this destination.",
       score: 70,
+      bookingUrl: "https://www.uber.com/in/en/ride/",
     },
     {
       mode: "METRO",
-      durationMinutes: 55,
-      duration: "55 mins",
-      distance: "15 km",
+      durationMinutes: roadTrafficEstimate?.duration ? parseInt(roadTrafficEstimate.duration.split(' ')[0]) : 55,
+      duration: roadTrafficEstimate?.duration || "55 mins",
+      distance: roadTrafficEstimate?.distance || "15 km",
       cost: "Rs. 70",
-      notes: "Generic mock metro estimate; station access may vary.",
+      notes: "Metro estimate; station access may vary.",
       score: 68,
+      bookingUrl: "https://www.bmrc.co.in/",
     },
     {
       mode: "TRANSIT",
-      durationMinutes: 60,
-      duration: "1 hr",
-      distance: "14 km",
+      durationMinutes: roadTrafficEstimate?.duration ? parseInt(roadTrafficEstimate.duration.split(' ')[0]) : 60,
+      duration: roadTrafficEstimate?.duration || "1 hr",
+      distance: roadTrafficEstimate?.distance || "14 km",
       cost: "Rs. 90",
-      notes: "Generic public transit estimate.",
+      notes: "Public transit estimate.",
       score: 60,
+      bookingUrl: "https://www.redbus.in/",
     },
   ];
+
+  return baseEstimates;
 }
 
 function findMatchingEvent(message: string, destination?: string) {
@@ -289,7 +317,7 @@ function inferEventTitle(message: string, destination: string, matchedEvent?: { 
   return `Trip to ${destination}`;
 }
 
-export function buildCommutePlan(options: CommutePlanOptions) {
+export async function buildCommutePlan(options: CommutePlanOptions) {
   const action = inferAction(options.message, options.action);
   const destination = inferDestination(options.message, options.destination);
 
@@ -301,9 +329,29 @@ export function buildCommutePlan(options: CommutePlanOptions) {
       knownDestinations: mockEvents.map((event) => event.location),
     };
   }
-
+  // Use current location as origin if available, otherwise fallback to provided origin or default
+  const origin = options.currentLocation?.address || 
+                 options.origin || 
+                 DEFAULT_ORIGIN;
   const matchedEvent = findMatchingEvent(options.message, destination);
-  const estimates = getMockModeEstimates(destination).sort((a, b) => b.score - a.score);
+  const roadTrafficEstimate = await getTravelEstimate(
+    origin,
+    destination
+  );
+  const estimates = getModeEstimates(destination, roadTrafficEstimate).sort((a, b) => b.score - a.score);
+  const carLikeEstimate = estimates.find(
+    (estimate) => estimate.mode === "CAB" || estimate.mode === "AUTO"
+  );
+
+  if (roadTrafficEstimate.source === "tomtom" && carLikeEstimate) {
+    carLikeEstimate.duration = roadTrafficEstimate.duration;
+    carLikeEstimate.distance = roadTrafficEstimate.distance;
+    carLikeEstimate.notes = `${carLikeEstimate.notes} TomTom traffic delay: ${
+      roadTrafficEstimate.trafficDelay ?? "0 mins"
+    }.`;
+  }
+
+  estimates.sort((a, b) => b.score - a.score);
   const recommended = estimates[0];
   const startTime = new Date(
     options.requestedStartTime || matchedEvent?.startTime || "2026-05-09T10:00:00+05:30"
@@ -322,7 +370,7 @@ export function buildCommutePlan(options: CommutePlanOptions) {
   return {
     success: true,
     action,
-    origin: options.origin || DEFAULT_ORIGIN,
+    origin,
     destination,
     matchedEvent,
     eventDraft:
@@ -337,11 +385,18 @@ export function buildCommutePlan(options: CommutePlanOptions) {
         : null,
     recommendedMode: recommended,
     alternatives: estimates.slice(1),
+    roadTrafficEstimate,
     leaveAt: formatTime(leaveAt),
     arrivalTarget: formatTime(startTime),
     bufferMinutes: BUFFER_MINUTES,
     conflicts,
     booking: bookingMode ? createMockBooking(bookingMode, destination) : null,
+    bookingOffers: {
+      cab: estimates.find(e => e.mode === "CAB")?.bookingUrl,
+      auto: estimates.find(e => e.mode === "AUTO")?.bookingUrl,
+      metro: estimates.find(e => e.mode === "METRO")?.bookingUrl,
+      transit: estimates.find(e => e.mode === "TRANSIT")?.bookingUrl,
+    },
     availableMockEvents: mockEvents,
   };
 }

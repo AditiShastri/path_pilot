@@ -5,7 +5,7 @@ export async function GET(request: Request) {
   const message = searchParams.get("q") || "I want to go to MG Road";
 
   return Response.json(
-    buildCommutePlan({
+    await buildCommutePlan({
       message,
       destination: searchParams.get("destination") ?? undefined,
       requestedStartTime: searchParams.get("startTime") ?? undefined,

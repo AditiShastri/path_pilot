@@ -1,6 +1,14 @@
 import { tool } from "ai";
 import { z } from "zod";
 import { buildCommutePlan } from "@/lib/commute-assistant";
+import { createClient } from "@supabase/supabase-js";
+import { getTelegramProfile } from "@/lib/telegram-db";
+import { sendTelegramReply } from "@/lib/telegram";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 export const commutePlanTool = tool({
   description: `
@@ -18,7 +26,15 @@ export const commutePlanTool = tool({
     origin: z
       .string()
       .optional()
-      .describe("Origin location. Defaults to Whitefield Bangalore."),
+      .describe("Origin location. Defaults to Whitefield Bangalore or current location if available."),
+    currentLocation: z
+      .object({
+        latitude: z.number(),
+        longitude: z.number(),
+        address: z.string().optional(),
+      })
+      .optional()
+      .describe("User's current location from browser geolocation"),
     requestedStartTime: z
       .string()
       .optional()

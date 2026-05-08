@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { saveTelegramChatId } from "@/lib/telegramStore";
+import { consumeTelegramToken } from "@/lib/telegramStore";
+import { saveTelegramChatIdWithAdmin } from "@/lib/telegram-db";
 
 import { sendTelegramReply } from "@/lib/telegram";
 
@@ -9,13 +10,13 @@ export async function POST(req: Request) {
   try {
     const update = await req.json();
 
-    // NOTE: We still use the in-memory telegramStore for /start <token> linking.
-    // For sending AI replies, chatId is already known from the update.
-
-
     const rawChatId = update.message?.chat?.id;
     const chatId = rawChatId ? String(rawChatId) : null;
     const message = update.message?.text?.trim();
+    const telegramUsername =
+      update.message?.chat?.username ??
+      update.message?.from?.username ??
+      null;
 
     if (!message || !chatId) {
       return NextResponse.json({ ok: true });
@@ -33,16 +34,25 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: true });
       }
 
-      // No DB/in-memory token consumption for now.
-      // Treat `start` payload as the Telegram chat id directly.
-      // token may be chat id (or you can later encode/decode other info).
-      const chatIdToSave = String(token);
-      saveTelegramChatId("local", chatIdToSave);
+      const linkRecord = consumeTelegramToken(token);
+      if (!linkRecord) {
+        await sendTelegramReply(
+          chatId,
+          "This Telegram connection link is invalid or expired. Please generate a new link from Pixie.",
+        );
+        return NextResponse.json({ ok: true });
+      }
 
-      // Confirm using the real incoming chat id.
+      await saveTelegramChatIdWithAdmin({
+        userId: linkRecord.userId,
+        email: linkRecord.email,
+        chatId,
+        username: telegramUsername,
+      });
+
       await sendTelegramReply(
         chatId,
-        "Success! Telegram chat id linked (local mode).",
+        "Success! Telegram is connected to Pixie.",
       );
       return NextResponse.json({ ok: true });
     }

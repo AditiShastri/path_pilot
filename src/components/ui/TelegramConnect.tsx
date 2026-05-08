@@ -7,26 +7,32 @@ import { toast } from "sonner";
 type TelegramLinkStatus = {
   connected: boolean;
   chatId?: string | null;
+  username?: string | null;
   link?: string | null;
 };
 
 export function TelegramConnect() {
   const [status, setStatus] = useState<TelegramLinkStatus | null>(null);
+  const [chatId, setChatId] = useState("");
+  const [isBusy, setIsBusy] = useState(false);
   const [open, setOpen] = useState(true);
 
-  useEffect(() => {
-    const refreshFromLocalStorage = () => {
-      const localChatId = localStorage.getItem("telegramChatId");
-      if (localChatId) {
-        setStatus({ connected: true, chatId: localChatId, link: null });
-      } else {
-        setStatus({ connected: false, chatId: null, link: null });
-      }
-    };
+  async function loadStatus() {
+    const response = await fetch("/api/telegram/link");
+    if (!response.ok) {
+      throw new Error("Could not load Telegram connection");
+    }
 
-    refreshFromLocalStorage();
-    window.addEventListener("storage", refreshFromLocalStorage);
-    return () => window.removeEventListener("storage", refreshFromLocalStorage);
+    const nextStatus = await response.json();
+    setStatus(nextStatus);
+    setChatId(nextStatus.chatId ?? "");
+  }
+
+  useEffect(() => {
+    loadStatus().catch((error) => {
+      console.error(error);
+      setStatus({ connected: false, chatId: null, link: null });
+    });
   }, []);
 
   if (!open) return null;
@@ -45,7 +51,7 @@ export function TelegramConnect() {
         <div>
           <div className="font-medium">Telegram</div>
           <div className="text-muted-foreground">
-            Set your chat id so the chatbot can send messages.
+            Connect your chat so Pixie can send reminders.
           </div>
         </div>
         <Button
@@ -62,40 +68,49 @@ export function TelegramConnect() {
       <div className="flex flex-col gap-4 mt-3">
         <div className="flex flex-col gap-3">
           <div className="text-muted-foreground text-xs">
-            Stored locally in your browser:{" "}
-            <span className="font-mono">localStorage.telegramChatId</span>
+            Stored in Supabase:{" "}
+            <span className="font-mono">path_pilot_users.telegram_chat_id</span>
           </div>
 
           <div className="flex flex-wrap gap-2 items-end">
             <input
               className="flex-1 min-w-[200px] rounded-md border border-border bg-background px-3 py-2 text-sm"
               placeholder="e.g. 123456789"
-              value={status.chatId ?? ""}
-              onChange={(e) => {
-                const v = e.target.value;
-                setStatus((prev) =>
-                  prev
-                    ? { ...prev, chatId: v, connected: Boolean(v) }
-                    : { connected: Boolean(v), chatId: v }
-                );
-              }}
+              value={chatId}
+              onChange={(e) => setChatId(e.target.value)}
               inputMode="numeric"
             />
 
             <Button
-              onClick={() => {
-                const v = status.chatId;
+              disabled={isBusy}
+              onClick={async () => {
+                const v = chatId.trim();
                 if (!v) {
                   toast.error("Enter a Telegram chat id first.");
                   return;
                 }
-                localStorage.setItem("telegramChatId", String(v));
-                toast.success("Telegram chat id saved locally.");
-                setStatus((prev) =>
-                  prev
-                    ? { ...prev, connected: true, chatId: String(v) }
-                    : { connected: true, chatId: String(v) }
-                );
+
+                try {
+                  setIsBusy(true);
+                  const response = await fetch("/api/telegram/link", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ chatId: v }),
+                  });
+
+                  if (!response.ok) {
+                    throw new Error(await response.text());
+                  }
+
+                  const nextStatus = await response.json();
+                  setStatus(nextStatus);
+                  setChatId(nextStatus.chatId ?? v);
+                  toast.success("Telegram chat id saved to Supabase.");
+                } catch (error: any) {
+                  toast.error(error?.message ?? "Could not save Telegram chat id.");
+                } finally {
+                  setIsBusy(false);
+                }
               }}
             >
               Save chat id
@@ -106,23 +121,78 @@ export function TelegramConnect() {
             <Button
               variant="secondary"
               size="sm"
-              onClick={() => {
-                const v = localStorage.getItem("telegramChatId");
-                setStatus({ connected: Boolean(v), chatId: v ?? null, link: null });
+              disabled={isBusy}
+              onClick={async () => {
+                try {
+                  setIsBusy(true);
+                  await loadStatus();
+                  toast.success("Telegram status refreshed.");
+                } catch (error: any) {
+                  toast.error(error?.message ?? "Could not refresh Telegram status.");
+                } finally {
+                  setIsBusy(false);
+                }
               }}
             >
-              Refresh from localStorage
+              Refresh from Supabase
             </Button>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => {
-                localStorage.removeItem("telegramChatId");
-                setStatus({ connected: false, chatId: null, link: null });
-                toast.success("Removed telegramChatId from localStorage.");
+              disabled={isBusy}
+              onClick={async () => {
+                try {
+                  setIsBusy(true);
+                  const response = await fetch("/api/telegram/link", {
+                    method: "DELETE",
+                  });
+
+                  if (!response.ok) {
+                    throw new Error(await response.text());
+                  }
+
+                  const nextStatus = await response.json();
+                  setStatus(nextStatus);
+                  setChatId("");
+                  toast.success("Telegram disconnected in Supabase.");
+                } catch (error: any) {
+                  toast.error(error?.message ?? "Could not clear Telegram chat id.");
+                } finally {
+                  setIsBusy(false);
+                }
               }}
             >
               Clear
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isBusy}
+              onClick={async () => {
+                try {
+                  setIsBusy(true);
+                  const response = await fetch("/api/telegram/link", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({}),
+                  });
+
+                  if (!response.ok) {
+                    throw new Error(await response.text());
+                  }
+
+                  const result = await response.json();
+                  setStatus((prev) => ({ ...(prev ?? { connected: false }), link: result.deepLink }));
+                  await navigator.clipboard.writeText(result.deepLink);
+                  toast.success("Telegram connect link copied.");
+                } catch (error: any) {
+                  toast.error(error?.message ?? "Could not generate Telegram link.");
+                } finally {
+                  setIsBusy(false);
+                }
+              }}
+            >
+              Copy bot link
             </Button>
           </div>
         </div>
@@ -130,16 +200,29 @@ export function TelegramConnect() {
         <div className="border-t border-border pt-4">
           <div className="font-medium">Connection method</div>
           <div className="text-muted-foreground text-xs mb-2">
-            For now the app uses <span className="font-mono">localStorage.telegramChatId</span> (no DB).
+            Pixie now reads Telegram chat ids from Supabase for reminders and test sends.
           </div>
 
           <div className="text-muted-foreground">
             {status.connected ? (
-              <>Using chat id: {status.chatId}</>
+              <>
+                Using chat id: {status.chatId}
+                {status.username ? <> (@{status.username})</> : null}
+              </>
             ) : (
-              <>Not connected yet. Paste your Telegram chat id above and click Save chat id.</>
+              <>Not connected yet. Paste your chat id or copy the bot link and send /start in Telegram.</>
             )}
           </div>
+          {status.link ? (
+            <a
+              className="mt-2 block text-primary underline underline-offset-4"
+              href={status.link}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Open Telegram connect link
+            </a>
+          ) : null}
         </div>
       </div>
     </div>

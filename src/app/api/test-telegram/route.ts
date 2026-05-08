@@ -1,17 +1,25 @@
 import { sendTelegramReply } from "@/lib/telegram";
+import { getConnectedTelegramChatIds } from "@/lib/telegram-db";
 
 export async function GET() {
-  const chatId = process.env.TELEGRAM_CHAT_ID;
-  if (!chatId) {
+  const recipients = await getConnectedTelegramChatIds();
+
+  if (recipients.length === 0) {
     return Response.json(
-      { success: false, error: "Missing TELEGRAM_CHAT_ID environment variable" },
+      {
+        success: false,
+        error: "No connected Telegram chat ids found in path_pilot_users",
+      },
       { status: 500 }
     );
   }
 
-  await sendTelegramReply(chatId, "Telegram test successful");
+  for (const recipient of recipients) {
+    await sendTelegramReply(recipient.chatId, "Telegram test successful");
+  }
 
   return Response.json({
     success: true,
+    recipients: recipients.length,
   });
 }

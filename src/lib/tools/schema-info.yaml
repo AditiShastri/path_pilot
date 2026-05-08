@@ -1,15 +1,100 @@
 schema_info:
-  version: 0
+  version: 1
   format: yaml
 
 tables:
+  path_pilot_users:
+    description: User profile and Path Pilot integration settings.
+    pk: id
+    columns:
+      id:
+        type: uuid
+        references: auth.users.id
+      email:
+        type: text
+      home_lat:
+        type: float8
+      home_lng:
+        type: float8
+      telegram_chat_id:
+        type: text
+        description: Telegram chat id used for bot reminders and notifications.
+      telegram_username:
+        type: text
+      telegram_connected:
+        type: bool
+      created_at:
+        type: timestamptz
 
-  example: Test
-  pk: Col1
-  
-      
+  path_pilot_calendar_connections:
+    description: Google Calendar connection tokens for a Path Pilot user.
+    pk: user_id
+    columns:
+      user_id:
+        type: uuid
+        references: path_pilot_users.id
+      access_token:
+        type: text
+      refresh_token:
+        type: text
+      expiry_date:
+        type: timestamptz
+      connected:
+        type: bool
+      created_at:
+        type: timestamptz
+      updated_at:
+        type: timestamptz
+
+  chats:
+    description: AI assistant chat sessions.
+    pk: id
+    columns:
+      id:
+        type: uuid
+      title:
+        type: text
+      created_at:
+        type: timestamp
+      updated_at:
+        type: timestamp
+      user_id:
+        type: uuid
+        references: auth.users.id
+      model_id:
+        type: text
+      mode:
+        type: text
+      app:
+        type: text
+
+  messages:
+    description: Messages belonging to AI assistant chats.
+    pk: id
+    columns:
+      id:
+        type: uuid
+      chat_id:
+        type: uuid
+        references: chats.id
+      role:
+        type: text
+      parts:
+        type: jsonb
+      created_at:
+        type: timestamp
+
+relationships:
+  - from: messages.chat_id
+    to: chats.id
+  - from: chats.user_id
+    to: auth.users.id
+  - from: path_pilot_users.id
+    to: auth.users.id
+  - from: path_pilot_calendar_connections.user_id
+    to: path_pilot_users.id
+
 display_rules:
-
   column_name_format:
     remove_underscores: true
     case: title_case
@@ -20,8 +105,8 @@ display_rules:
       Use TO_CHAR(date_column, 'MM/DD/YYYY')
 
   examples:
-    - "delivery_date → 04/03/2026"
-    - "retirement_date → 12/31/2030"
+    - "created_at -> 04/03/2026"
+    - "updated_at -> 12/31/2030"
 
   sql_enforcement:
     require_alias: true

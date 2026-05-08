@@ -1,5 +1,6 @@
 export type TelegramTokenRecord = {
   userId: string;
+  email?: string | null;
   expiresAt: number;
 };
 
@@ -17,8 +18,9 @@ export function saveTelegramToken(
   userId: string,
   token: string,
   expiresAt: number,
+  email?: string | null,
 ) {
-  telegramTokens.set(token, { userId, expiresAt });
+  telegramTokens.set(token, { userId, email, expiresAt });
   userPendingToken.set(userId, token);
 }
 
@@ -44,7 +46,10 @@ export function consumeTelegramToken(token: string) {
   telegramTokens.delete(token);
   userPendingToken.delete(record.userId);
   if (record.expiresAt <= Date.now()) return null;
-  return record.userId;
+  return {
+    userId: record.userId,
+    email: record.email,
+  };
 }
 
 export function saveTelegramChatId(userId: string, chatId: string) {

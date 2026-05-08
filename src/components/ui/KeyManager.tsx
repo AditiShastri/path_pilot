@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -61,6 +62,9 @@ export function KeyManagerDialog() {
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>API Keys</DialogTitle>
+          <DialogDescription>
+            Manage your API keys for different AI providers. Keys are stored securely in your browser.
+          </DialogDescription>
         </DialogHeader>
 
         <FieldGroup>
