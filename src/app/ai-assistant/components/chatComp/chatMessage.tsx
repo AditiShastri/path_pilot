@@ -4,6 +4,7 @@ import { Message,MessageAction, MessageActions, MessageContent } from "@/compone
 import { ToolExecutionSummary } from "./toolExecutionSummary";
 import { cn } from "@/lib/utils";
 import { PresentDataCard } from "./presentDataCard";
+import { CalendarConnectCard } from "./calendarConnectCard";
 import { CheckCheck, Copy, RefreshCcw, Volume2, VolumeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Markdown } from "@/components/Markdown";
@@ -113,6 +114,19 @@ export const ChatMessage = memo(function ChatMessage({
   function renderSpecialDisplay(toolPart: any, key: string) {
     if (toolPart?.type === "tool-present_data") {
       return <PresentDataCard key={key} toolPart={toolPart} />;
+    }
+
+    const toolType = typeof toolPart?.type === "string" ? toolPart.type : "";
+    const output = (toolPart?.output ?? {}) as Record<string, any>;
+    const connectUrl = typeof output.connectUrl === "string" ? output.connectUrl : null;
+    const connected = typeof output.connected === "boolean" ? output.connected : null;
+
+    if (
+      (toolType === "tool-upcoming_events" || toolType === "tool-commute_advice_next_event") &&
+      connected === false &&
+      connectUrl
+    ) {
+      return <CalendarConnectCard key={key} connectUrl={connectUrl} />;
     }
 
     return null;

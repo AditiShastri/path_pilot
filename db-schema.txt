@@ -1,0 +1,60 @@
+
+
+
+create table public.chats (
+  id uuid not null,
+  title text null,
+  created_at timestamp without time zone null default now(),
+  updated_at timestamp without time zone null default now(),
+  user_id uuid null default auth.uid (),
+  model_id text null,
+  mode text null,
+  app text null,
+  constraint chats_pkey primary key (id),
+  constraint chats_user_id_fkey foreign KEY (user_id) references auth.users (id)
+) TABLESPACE pg_default;
+
+create table public.messages (
+  id uuid not null default gen_random_uuid (),
+  chat_id uuid null,
+  role text not null,
+  parts jsonb not null,
+  created_at timestamp without time zone null default now(),
+  constraint messages_pkey primary key (id),
+  constraint messages_chat_id_fkey foreign KEY (chat_id) references chats (id) on delete CASCADE
+) TABLESPACE pg_default;
+
+create index IF not exists messages_chat_id_idx on public.messages using btree (chat_id) TABLESPACE pg_default;
+
+create index IF not exists chats_updated_at_idx on public.chats using btree (updated_at desc) TABLESPACE pg_default;
+
+create table public.path_pilot_users (
+  id uuid not null,
+  email text null,
+  home_lat double precision null,
+  home_lng double precision null,
+  telegram_chat_id text null,
+  telegram_username text null,
+  telegram_connected boolean null default false,
+  created_at timestamp with time zone null default now(),
+  constraint path_pilot_users_pkey primary key (id),
+  constraint path_pilot_users_email_key unique (email),
+  constraint path_pilot_users_id_fkey foreign KEY (id) references auth.users (id) on delete CASCADE
+) TABLESPACE pg_default;
+
+create table public.path_pilot_calendar_connections (
+  user_id uuid not null,
+  access_token text not null,
+  refresh_token text not null,
+  expiry_date timestamp with time zone null,
+  connected boolean null default true,
+  created_at timestamp with time zone null default now(),
+  updated_at timestamp with time zone null default now(),
+  constraint path_pilot_calendar_connections_pkey primary key (user_id),
+  constraint path_pilot_calendar_connections_user_id_fkey foreign KEY (user_id) references path_pilot_users (id) on delete CASCADE
+) TABLESPACE pg_default;
+
+create trigger path_pilot_set_calendar_connections_updated_at BEFORE
+update on path_pilot_calendar_connections for EACH row
+execute FUNCTION path_pilot_set_updated_at ();
+

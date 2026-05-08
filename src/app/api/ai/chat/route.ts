@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { resolveModel } from "@/lib/ai/model-resolver";
 import { SYSTEM_PROMPT, VOICE_ASSISTANT_SYSTEM_PROMPT } from "@/lib/systemPrompt";
 import { presentDataTool } from "@/lib/tools/presentDataTool";
+import { createCalendarTools } from "@/lib/tools/calendarTools";
 import { errorDecoder } from "@/lib/ai/decodeError";
 
 export async function POST(req: Request) {
@@ -28,6 +29,8 @@ export async function POST(req: Request) {
     }
   const { messages, mode, modelId, userApiKey, voiceAssistantEnabled } = await req.json();
 
+  const calendarTools = createCalendarTools({ userId: user.id, baseUrl: req.url });
+
   const model = resolveModel({ mode, model: modelId, userApiKey });
   
   const modelMessages = (await convertToModelMessages(messages)).slice(-12);
@@ -43,6 +46,7 @@ export async function POST(req: Request) {
       messages: prunedMessages,
       tools: { 
         present_data: presentDataTool,
+        ...calendarTools,
       },
       toolChoice: "auto",
       // Stop after 10 steps

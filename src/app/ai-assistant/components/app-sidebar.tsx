@@ -7,6 +7,9 @@ import {
   MoreHorizontal,
   SquarePen,
   PawPrint,
+  CalendarDays,
+  CheckCircle,
+  XCircle,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -79,9 +82,42 @@ export function AppSidebar({
   const [editingId, setEditingId] = React.useState<string | null>(null)
   const [title, setTitle] = React.useState("")
   const { user } = useUserInfo();
+  const [calendarConnected, setCalendarConnected] = React.useState<boolean | null>(null);
+  const [calendarConnectUrl, setCalendarConnectUrl] = React.useState<string>("/auth/google-calendar/connect");
   const safeChats = Array.isArray(chats) ? chats : []
   const grouped = React.useMemo(() => groupChatsByDate(safeChats), [safeChats])
   const router = useRouter();
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    async function loadCalendarStatus() {
+      if (!user?.auth_id) {
+        setCalendarConnected(null);
+        return;
+      }
+      try {
+        const res = await fetch("/api/calendar/status", { credentials: "include" });
+        if (!res.ok) {
+          if (!cancelled) setCalendarConnected(false);
+          return;
+        }
+        const data = (await res.json()) as { connected?: boolean; connectUrl?: string };
+        if (cancelled) return;
+        setCalendarConnected(Boolean(data?.connected));
+        if (typeof data?.connectUrl === "string") {
+          setCalendarConnectUrl(data.connectUrl);
+        }
+      } catch {
+        if (!cancelled) setCalendarConnected(false);
+      }
+    }
+
+    loadCalendarStatus();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.auth_id]);
   async function deleteChat(id: string) {
     await fetch(`/api/chats/${id}`, {
       method: "DELETE",
@@ -142,6 +178,28 @@ export function AppSidebar({
             )}
             Voice Assistant {voiceAssistantEnabled ? "On" : "Off"}
           </Button>
+
+          {calendarConnected !== null && (
+            <div className="px-3 flex items-center gap-2 text-muted-foreground">
+              {calendarConnected ? (
+                <CheckCircle className="size-5 text-green-500" />
+              ) : (
+                <XCircle className="size-5 text-muted-foreground" />
+              )}
+                Calendar: {calendarConnected ? "Connected" : "Not connected"}
+            </div>
+          )}
+
+          {calendarConnected === false && (
+            <Button
+              onClick={() => router.push(calendarConnectUrl)}
+              className="w-full justify-start items-center gap-2"
+              variant="ghost"
+            >
+              <CalendarDays className="size-5" />
+              Connect Calendar
+            </Button>
+          )}
         </div>
         <Separator className="mb-4" />
         
