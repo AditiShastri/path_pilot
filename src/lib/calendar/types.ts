@@ -1,7 +1,7 @@
 export type UpcomingCalendarEvent = {
   id: string;
   title: string;
-  location: string;
+  location?: string;
   startTime: string;
   endTime: string;
 };
@@ -10,6 +10,7 @@ export type CreateCalendarEventInput = {
   title: string;
   startTime: string;
   endTime: string;
+  durationMinutes?: number;
   timeZone?: string;
   location?: string;
   description?: string;

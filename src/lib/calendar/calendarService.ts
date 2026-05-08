@@ -13,12 +13,12 @@ type GoogleCalendarEvent = {
   end?: { dateTime?: string; date?: string };
 };
 
-function toEvent(item: GoogleCalendarEvent): UpcomingCalendarEvent | null {
+function toEvent(item: GoogleCalendarEvent, requireLocation: boolean): UpcomingCalendarEvent | null {
   if (!item.id) return null;
   if (item.status === "cancelled") return null;
 
   const location = (item.location ?? "").trim();
-  if (!location) return null;
+  if (requireLocation && !location) return null;
 
   const startTime = item.start?.dateTime ?? item.start?.date;
   const endTime = item.end?.dateTime ?? item.end?.date;
@@ -27,32 +27,41 @@ function toEvent(item: GoogleCalendarEvent): UpcomingCalendarEvent | null {
   return {
     id: item.id,
     title: (item.summary ?? "(No title)").trim() || "(No title)",
-    location,
+    location: location || undefined,
     startTime,
     endTime,
   };
 }
 
-export async function getUpcomingEvents(
+type ListCalendarEventsOptions = {
+  timeMin: string;
+  timeMax: string;
+  maxResults?: number;
+  requireLocation?: boolean;
+};
+
+export async function listCalendarEvents(
   userId: string,
+  options: ListCalendarEventsOptions,
   debug?: { traceId?: string }
 ): Promise<UpcomingCalendarEvent[]> {
-  const now = new Date();
-  const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-
   const traceId = debug?.traceId;
-  debugLog("getUpcomingEvents start", {
+  const requireLocation = options.requireLocation ?? false;
+
+  debugLog("listCalendarEvents start", {
     traceId,
     userId,
-    timeMin: now.toISOString(),
-    timeMax: in24h.toISOString(),
+    timeMin: options.timeMin,
+    timeMax: options.timeMax,
+    maxResults: options.maxResults ?? 50,
+    requireLocation,
   });
 
   const client = await getGoogleCalendarClient(userId);
   const data = await client.listPrimaryEvents({
-    timeMin: now.toISOString(),
-    timeMax: in24h.toISOString(),
-    maxResults: 25,
+    timeMin: options.timeMin,
+    timeMax: options.timeMax,
+    maxResults: options.maxResults ?? 50,
   });
 
   const items = (data?.items ?? []) as GoogleCalendarEvent[];
@@ -72,7 +81,7 @@ export async function getUpcomingEvents(
       continue;
     }
     const location = (it.location ?? "").trim();
-    if (!location) {
+    if (requireLocation && !location) {
       noLocation++;
       continue;
     }
@@ -91,7 +100,6 @@ export async function getUpcomingEvents(
     filteredOut: { noId, cancelled, noLocation, noTimes },
   });
 
-  // Helpful sample to confirm if Google returned events but without locations.
   debugLog("Google events sample flags", {
     traceId,
     userId,
@@ -104,14 +112,33 @@ export async function getUpcomingEvents(
     })),
   });
 
-  const events = items.map(toEvent).filter(Boolean) as UpcomingCalendarEvent[];
+  const events = items.map((item) => toEvent(item, requireLocation)).filter(Boolean) as UpcomingCalendarEvent[];
 
-  debugLog("Upcoming events after filtering", {
+  debugLog("Calendar events after filtering", {
     traceId,
     userId,
     count: events.length,
+    requireLocation,
   });
   return events;
+}
+
+export async function getUpcomingEvents(
+  userId: string,
+  debug?: { traceId?: string }
+): Promise<UpcomingCalendarEvent[]> {
+  const now = new Date();
+  const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  return listCalendarEvents(
+    userId,
+    {
+      timeMin: now.toISOString(),
+      timeMax: in24h.toISOString(),
+      maxResults: 25,
+      requireLocation: true,
+    },
+    debug
+  );
 }
 
 type GoogleCalendarCreatedEvent = {

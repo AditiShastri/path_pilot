@@ -8,6 +8,8 @@ import { resolveModel } from "@/lib/ai/model-resolver";
 import { SYSTEM_PROMPT, VOICE_ASSISTANT_SYSTEM_PROMPT } from "@/lib/systemPrompt";
 import { presentDataTool } from "@/lib/tools/presentDataTool";
 import { createCalendarTools } from "@/lib/tools/calendarTools";
+import { createRoutingTools } from "@/lib/tools/routingTools";
+import { tavilyTool } from "@/lib/tools/tavilyTool";
 import { errorDecoder } from "@/lib/ai/decodeError";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -70,11 +72,15 @@ export async function POST(req: Request) {
   }
 
   const baseSystem = voiceAssistantEnabled ? VOICE_ASSISTANT_SYSTEM_PROMPT : SYSTEM_PROMPT;
-  const system = resolvedCoords
-    ? `${baseSystem}\n\n# User Location Context\n- Preferred origin source: ${requestedSource}\n- Preferred origin coordinates: ${resolvedCoords.lat.toFixed(6)}, ${resolvedCoords.lng.toFixed(6)}\nUse this as the default origin when the user asks for commute/travel planning and does not specify an origin.`
-    : baseSystem;
+  const today = new Date().toISOString().slice(0, 10);
+  const dateContext = `# Current Date\n- Today is ${today} (ISO-8601).`;
+  const locationContext = resolvedCoords
+    ? `# User Location Context\n- Preferred origin source: ${requestedSource}\n- Preferred origin coordinates: ${resolvedCoords.lat.toFixed(6)}, ${resolvedCoords.lng.toFixed(6)}\nUse this as the default origin when the user asks for commute/travel planning and does not specify an origin.`
+    : null;
+  const system = [baseSystem, dateContext, locationContext].filter(Boolean).join("\n\n");
 
   const calendarTools = createCalendarTools({ userId: user.id, baseUrl: req.url });
+  const routingTools = createRoutingTools({ defaultOrigin: resolvedCoords });
 
   const model = resolveModel({ mode, model: modelId, userApiKey });
   
@@ -91,7 +97,9 @@ export async function POST(req: Request) {
       messages: prunedMessages,
       tools: { 
         present_data: presentDataTool,
+        web_search: tavilyTool,
         ...calendarTools,
+        ...routingTools,
       },
       toolChoice: "auto",
       // Stop after 10 steps

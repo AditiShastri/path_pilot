@@ -1,5 +1,5 @@
 import { PromptSuggestion } from "@/components/ui/prompt-suggestion"
-import { Pencil,Database,Plane,Recycle } from "lucide-react";
+import { Bus, CalendarClock, Globe, Route } from "lucide-react";
 
 type newChatProps={
     setInput:(msg:string)=>void;
@@ -15,7 +15,7 @@ export function NewChat({setInput}:newChatProps){
                  PATH-PILOT
               </h2>
               <p className="text-muted-foreground text-sm">
-                Query data • Preview changes • Execute with confidence
+                Plan your day • Organize events • Choose the best commute
               </p>
             </div>
 
@@ -25,48 +25,48 @@ export function NewChat({setInput}:newChatProps){
                 className="bg-blue-500/10 border border-blue-500/20 hover:bg-blue-500/20"
                 onClick={() =>
                   setInput(
-                    "What can you do with aircraft and engine data?"
+                    "Plan my day tomorrow with my calendar events and suggest ideal travel times."
                   )
                 }
               >
-                <Pencil className="text-blue-500"/>
-                Get Started
+                <CalendarClock className="text-blue-500"/>
+                Plan My Day
               </PromptSuggestion>
 
               <PromptSuggestion
                 className="bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/20"
                 onClick={() =>
                   setInput(
-                    "Show me what data is available in the database"
+                    "I have a meeting at 10 AM in Koramangala. Calculate commute time from my saved location."
                   )
                 }
               >
-                <Database className="text-amber-500"/>
-                Schema Info
+                <Route className="text-amber-500"/>
+                Estimate Commute
               </PromptSuggestion>
 
               <PromptSuggestion
                 className="bg-emerald-500/10  border border-emerald-500/20 hover:bg-emerald-500/20"
                 onClick={() =>
                   setInput(
-                    "List all aircraft with their delivery and retirement dates"
+                    "Find the best public transit option to my next event and tell me when to leave."
                   )
                 }
               >
-                <Plane className="text-emerald-500"/>
-                Aircraft Insight
+                <Bus className="text-emerald-500"/>
+                Public Transit
               </PromptSuggestion>
 
               <PromptSuggestion
                 className="bg-purple-500/10 border border-purple-500/20 hover:bg-purple-500/20"
                 onClick={() =>
                   setInput(
-                    "Which aircraft are closest to retirement?"
+                    "Check current conditions that could affect my commute today and summarize them."
                   )
                 }
               >
-                <Recycle className="text-purple-500"/>
-                Lifecycle Insight
+                <Globe className="text-purple-500"/>
+                Live Travel Context
               </PromptSuggestion>
             </div>
           </div>

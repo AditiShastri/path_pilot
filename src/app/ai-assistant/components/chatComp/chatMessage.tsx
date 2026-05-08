@@ -124,7 +124,6 @@ export const ChatMessage = memo(function ChatMessage({
     if (
       (
         toolType === "tool-upcoming_events" ||
-        toolType === "tool-commute_advice_next_event" ||
         toolType === "tool-create_calendar_event"
       ) &&
       connected === false &&

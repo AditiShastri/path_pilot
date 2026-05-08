@@ -2,6 +2,14 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
+### Environment variables
+
+For TomTom-backed route planning, set:
+
+```bash
+TOMTOM_API_KEY=your_tomtom_api_key
+```
+
 First, run the development server:
 
 ```bash
