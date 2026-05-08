@@ -39,7 +39,7 @@ export default function Home() {
     <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-4">
       <Card className="w-full max-w-xl shadow-xl border-border">
         <CardHeader className="space-y-2">
-          <CardTitle className="text-3xl" /*onClick={()=>console.log(user)}*/>Pixie Home</CardTitle>
+          <CardTitle className="text-3xl" /*onClick={()=>console.log(user)}*/>Path-Pilot Home</CardTitle>
           <CardDescription>
             {userEmail
               ? `Signed in as ${userEmail}`

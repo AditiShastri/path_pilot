@@ -6,7 +6,7 @@ import {
   ChainOfThoughtStep,
   ChainOfThoughtTrigger,
 } from "@/components/ui/chain-of-thought";
-import { Database, Eye, Globe, Loader2, Network, PenLine, Presentation, Wrench } from "lucide-react";
+import { Globe, Loader2, Presentation, Wrench } from "lucide-react";
 
 function getToolVisual(toolType: string) {
   const normalizedType = toolType.replace(/^tool-/, "");
@@ -21,22 +21,6 @@ function getToolVisual(toolType: string) {
     web_search: {
       Icon: Globe,
       iconClassName: "text-blue-500",
-    },
-    read_sql: {
-      Icon: Database,
-      iconClassName: "text-teal-500",
-    },
-    schema_info: {
-      Icon: Network,
-      iconClassName: "text-cyan-500",
-    },
-    execute_preview_write_sql: {
-      Icon: Eye,
-      iconClassName: "text-orange-500",
-    },
-    execute_write_sql: {
-      Icon: PenLine,
-      iconClassName: "text-green-500",
     },
     present_data: {
       Icon: Presentation,
@@ -59,22 +43,6 @@ function getToolSummary(toolType: string) {
     web_search: {
       title: "Performing web search",
       description: "Retrieving information from online websites.",
-    },
-    read_sql: {
-      title: "Running database query",
-      description: "Accessing structured records from the database.",
-    },
-    schema_info: {
-      title: "Inspecting schema",
-      description: "Reviewing table and relationship metadata.",
-    },
-    execute_preview_write_sql: {
-      title: "Previewing write SQL",
-      description: "Running write in rollback transaction to inspect impact.",
-    },
-    execute_write_sql: {
-      title: "Committing write SQL",
-      description: "Applying confirmed write changes to the database.",
     },
     present_data: {
       title: "Presenting data",

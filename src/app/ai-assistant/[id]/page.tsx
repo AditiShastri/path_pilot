@@ -51,7 +51,6 @@ import {
 } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { VoiceOrb } from "@/components/ui/voice-orb";
-import { WriteCommitStateMap } from "../components/chatComp/writeSqlCards";
 import { ChatTimeline } from "../components/chatComp/chatTimeline";
 import { TokenUsageDialog } from "../components/chatComp/tokenUsage";
 import { NewChat } from "../components/chatComp/newChat";
@@ -78,12 +77,7 @@ function removeToolResults(messages: UIMessage[]) {
         if (typeof part.type !== "string") return true;
 
         const isTool = part.type.startsWith("tool-");
-        const isAllowed =
-          part.type === "tool-read_sql" ||
-          part.type === "tool-schema_info" ||
-          part.type === "tool-present_data" ||
-          part.type === "tool-execute_preview_write_sql" ||
-          part.type === "tool-execute_write_sql";
+        const isAllowed = part.type === "tool-present_data";
 
         return !(isTool && !isAllowed);
       }
@@ -177,7 +171,6 @@ export default function Page() {
   const [voiceAssistantEnabled, setVoiceAssistantEnabled] = useState(false);
   const [voiceSidebarOpen, setVoiceSidebarOpen] = useState(true);
   const [voiceSidebarExpanded, setVoiceSidebarExpanded] = useState(false);
-  const [writeCommitState, setWriteCommitState] = useState<WriteCommitStateMap>({});
   const recognitionRef = useRef<any>(null);
   const speechQueueRef = useRef<Array<{ messageId: string; text: string }>>([]);
   const isSpeechActiveRef = useRef(false);
@@ -895,56 +888,6 @@ export default function Page() {
     sendRef.current = send;
   }, [send]);
 
-  const handleConfirmWritePreview = useCallback(async (previewId: string) => {
-    setWriteCommitState((prev) => ({
-      ...prev,
-      [previewId]: { status: "loading" },
-    }));
-
-    try {
-      const res = await fetch("/api/ai/write/confirm", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ preview_id: previewId }),
-      });
-
-      const payload = await res.json();
-
-      if (!res.ok) {
-        throw new Error(payload?.error ?? "Failed to commit write.");
-      }
-
-      setWriteCommitState((prev) => ({
-        ...prev,
-        [previewId]: {
-          status: "success",
-          message:
-            payload?.summary ??
-            `Committed successfully. Affected rows: ${payload?.affected_rows ?? 0}`,
-          output: {
-            preview_id: previewId,
-            operation: payload?.operation ?? null,
-            table: payload?.table_name ?? null,
-            affected_rows: payload?.affected_rows ?? 0,
-            committed_at: payload?.committed_at ?? null,
-            summary:
-              payload?.summary ??
-              `Committed successfully. Affected rows: ${payload?.affected_rows ?? 0}`,
-          },
-        },
-      }));
-    } catch (error: any) {
-      setWriteCommitState((prev) => ({
-        ...prev,
-        [previewId]: {
-          status: "error",
-          message: error?.message ?? "Failed to commit write.",
-        },
-      }));
-    }
-  }, []);
-
   const handleRegenerate = useCallback((messageId: string) => {
     const { provider } = parseModelValue(selectedModel);
     const userApiKey = keys[provider];
@@ -1130,7 +1073,7 @@ export default function Page() {
             className="mr-2 data-[orientation=vertical]:h-4"
           />
           <h1 className="text-md font-medium tracking-wide text-muted-foreground" onClick={()=>console.log(messages.slice(-4))}>
-            Pixie
+            path-pilot
           </h1>
         </div>
         <div className="flex items-center gap-3">
@@ -1197,11 +1140,9 @@ export default function Page() {
           devMode={devMode}
           error={error}
           speakingId={speakingId}
-          writeCommitState={writeCommitState}
           onCopyMessage={handleCopyMessage}
           onRegenerate={handleRegenerate}
           onReadAloud={handleReadAloud}
-          onConfirmWritePreview={handleConfirmWritePreview}
           setMessages={setMessages}
           send={send}
         />
@@ -1303,7 +1244,7 @@ export default function Page() {
               )}
             >
               <div className="flex h-12 shrink-0 items-center justify-between border-b border-border px-3">
-                <h2 className="text-sm font-semibold tracking-wide">Pixie Chat</h2>
+                <h2 className="text-sm font-semibold tracking-wide">path-pilot Chat</h2>
                 <div className="flex items-center gap-1">
                   <Button
                     type="button"

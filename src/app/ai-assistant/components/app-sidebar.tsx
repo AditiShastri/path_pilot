@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import {
-  Download,
   Mic,
   MicOff,
   MoreHorizontal,
@@ -21,7 +20,6 @@ import { Separator } from "@/components/ui/separator"
 import { NavUser } from "@/components/nav-user"
 import { cn } from "@/lib/utils"
 import { useUserInfo } from "@/hooks/useUserInfo"
-import { toast } from "sonner"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -80,7 +78,6 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const [editingId, setEditingId] = React.useState<string | null>(null)
   const [title, setTitle] = React.useState("")
-  const [isExporting, setIsExporting] = React.useState(false)
   const { user } = useUserInfo();
   const safeChats = Array.isArray(chats) ? chats : []
   const grouped = React.useMemo(() => groupChatsByDate(safeChats), [safeChats])
@@ -103,40 +100,6 @@ export function AppSidebar({
     setEditingId(null)
     refreshChats()
   }
-
-  async function downloadDatasetExcel() {
-    if (isExporting) return
-    setIsExporting(true)
-
-    try {
-      const response = await fetch("/api/export/excel", {
-        method: "GET",
-        credentials: "include",
-      })
-
-      if (!response.ok) {
-        throw new Error("Failed to export data")
-      }
-
-      const blob = await response.blob()
-      const url = URL.createObjectURL(blob)
-      const anchor = document.createElement("a")
-      const filename = `pixie-data-export-${new Date().toISOString().slice(0, 10)}.xlsx`
-
-      anchor.href = url
-      anchor.download = filename
-      document.body.appendChild(anchor)
-      anchor.click()
-      anchor.remove()
-      URL.revokeObjectURL(url)
-
-      toast.success("Data export downloaded")
-    } catch {
-      toast.error("Unable to download data export")
-    } finally {
-      setIsExporting(false)
-    }
-  }
   const userData = user ? {
     name: user.name || "User",
     email: user.email || "",
@@ -151,7 +114,7 @@ export function AppSidebar({
       <SidebarHeader className="p-3 pb-4 border-b w-full">
         <div className="flex items-center justify-between gap-2">
           
-          <h1 className="text-lg font-bold tracking-widest">PIXIE</h1>
+          <h1 className="text-lg font-bold tracking-widest">PATH-PILOT</h1>
           <PawPrint className="size-6" />
         </div>
       </SidebarHeader>
@@ -165,15 +128,6 @@ export function AppSidebar({
           >
             <SquarePen className="size-5" />
             New Chat
-          </Button>
-          <Button
-            onClick={downloadDatasetExcel}
-            className="w-full justify-start items-center gap-2"
-            variant="ghost"
-            disabled={isExporting}
-          >
-            <Download className="size-5" />
-            {isExporting ? "Downloading..." : "Excel Data"}
           </Button>
           <Button
             onClick={onToggleVoiceAssistant}

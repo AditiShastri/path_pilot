@@ -11,7 +11,6 @@ import {
 import { ScrollButton } from "@/components/ui/scroll-button";
 import { SystemMessage } from "@/components/ui/system-message";
 import { ChatMessage } from "./chatMessage";
-import { WriteCommitStateMap } from "./writeSqlCards";
 
 type ChatTimelineProps = {
   chatId: string;
@@ -22,11 +21,9 @@ type ChatTimelineProps = {
   devMode: boolean;
   error: Error | null | undefined;
   speakingId: string | null;
-  writeCommitState: WriteCommitStateMap;
   onCopyMessage: (message: any) => void | Promise<void>;
   onRegenerate: (messageId: string) => void;
   onReadAloud: (message: any) => void;
-  onConfirmWritePreview: (previewId: string) => Promise<void>;
   setMessages: (messages: UIMessage[]) => void;
   send: (message?: string) => void | Promise<void>;
 };
@@ -61,21 +58,17 @@ const StableMessageList = memo(
     copiedId,
     devMode,
     speakingId,
-    writeCommitState,
     onCopyMessage,
     onRegenerate,
     onReadAloud,
-    onConfirmWritePreview,
   }: Pick<
     ChatTimelineProps,
     | "copiedId"
     | "devMode"
     | "speakingId"
-    | "writeCommitState"
     | "onCopyMessage"
     | "onRegenerate"
     | "onReadAloud"
-    | "onConfirmWritePreview"
   > & {
     messages: UIMessage[];
     hasActiveMessage: boolean;
@@ -106,8 +99,6 @@ const StableMessageList = memo(
             isSpeaking={speakingId === message.id}
             onReadAloud={onReadAloud}
             devMode={devMode}
-            onConfirmWritePreview={onConfirmWritePreview}
-            writeCommitState={writeCommitState}
           />
         ))}
       </>
@@ -119,11 +110,10 @@ const StableMessageList = memo(
     prev.copiedId === next.copiedId &&
     prev.devMode === next.devMode &&
     prev.speakingId === next.speakingId &&
-    prev.writeCommitState === next.writeCommitState &&
     prev.onCopyMessage === next.onCopyMessage &&
     prev.onRegenerate === next.onRegenerate &&
     prev.onReadAloud === next.onReadAloud &&
-    prev.onConfirmWritePreview === next.onConfirmWritePreview,
+    prev.onReadAloud === next.onReadAloud,
 );
 
 const ActiveMessageRow = memo(function ActiveMessageRow({
@@ -132,22 +122,18 @@ const ActiveMessageRow = memo(function ActiveMessageRow({
   copiedId,
   devMode,
   speakingId,
-  writeCommitState,
   onCopyMessage,
   onRegenerate,
   onReadAloud,
-  onConfirmWritePreview,
 }: {
   message: UIMessage | null;
   status: string;
   copiedId: string | null;
   devMode: boolean;
   speakingId: string | null;
-  writeCommitState: WriteCommitStateMap;
   onCopyMessage: (message: any) => void | Promise<void>;
   onRegenerate: (messageId: string) => void;
   onReadAloud: (message: any) => void;
-  onConfirmWritePreview: (previewId: string) => Promise<void>;
 }) {
   if (!message) return null;
 
@@ -162,8 +148,6 @@ const ActiveMessageRow = memo(function ActiveMessageRow({
       isSpeaking={speakingId === message.id}
       onReadAloud={onReadAloud}
       devMode={devMode}
-      onConfirmWritePreview={onConfirmWritePreview}
-      writeCommitState={writeCommitState}
     />
   );
 });
@@ -177,11 +161,9 @@ export function ChatTimeline({
   devMode,
   error,
   speakingId,
-  writeCommitState,
   onCopyMessage,
   onRegenerate,
   onReadAloud,
-  onConfirmWritePreview,
   setMessages,
   send,
 }: ChatTimelineProps) {
@@ -237,11 +219,9 @@ export function ChatTimeline({
                 copiedId={copiedId}
                 devMode={devMode}
                 speakingId={speakingId}
-                writeCommitState={writeCommitState}
                 onCopyMessage={onCopyMessage}
                 onRegenerate={onRegenerate}
                 onReadAloud={onReadAloud}
-                onConfirmWritePreview={onConfirmWritePreview}
               />
               <ActiveMessageRow
                 message={activeMessage}
@@ -249,11 +229,9 @@ export function ChatTimeline({
                 copiedId={copiedId}
                 devMode={devMode}
                 speakingId={speakingId}
-                writeCommitState={writeCommitState}
                 onCopyMessage={onCopyMessage}
                 onRegenerate={onRegenerate}
                 onReadAloud={onReadAloud}
-                onConfirmWritePreview={onConfirmWritePreview}
               />
             </>
           )}

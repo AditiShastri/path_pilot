@@ -6,13 +6,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { resolveModel } from "@/lib/ai/model-resolver";
 import { SYSTEM_PROMPT, VOICE_ASSISTANT_SYSTEM_PROMPT } from "@/lib/systemPrompt";
-import { readSqlTool } from "@/lib/tools/readSqlTool";
-import { schemaInfoTool } from "@/lib/tools/schemaInfoTool";
 import { presentDataTool } from "@/lib/tools/presentDataTool";
-import {
-  executeWriteSqlTool,
-  previewWriteSqlTool,
-} from "@/lib/tools/writeSqlTool";
 import { errorDecoder } from "@/lib/ai/decodeError";
 
 export async function POST(req: Request) {
@@ -48,11 +42,7 @@ export async function POST(req: Request) {
       system: voiceAssistantEnabled ? VOICE_ASSISTANT_SYSTEM_PROMPT : SYSTEM_PROMPT,
       messages: prunedMessages,
       tools: { 
-        read_sql: readSqlTool,
-        schema_info: schemaInfoTool,
         present_data: presentDataTool,
-        execute_preview_write_sql: previewWriteSqlTool,
-        execute_write_sql: executeWriteSqlTool,
       },
       toolChoice: "auto",
       // Stop after 10 steps

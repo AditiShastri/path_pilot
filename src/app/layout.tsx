@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Pixie - AI Assistant",
-  description: "AI-powered assistant application",
+  title: "Path-Pilot",
+  description: "AI-powered assistant application.",
 };
 
 export default function RootLayout({

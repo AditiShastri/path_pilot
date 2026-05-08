@@ -12,7 +12,7 @@ export function NewChat({setInput}:newChatProps){
             {/* Title */}
             <div className="space-y-2">
               <h2 className="text-5xl sm:text-7xl font-semibold tracking-tight tracking-wider" >
-                 PIXIE
+                 PATH-PILOT
               </h2>
               <p className="text-muted-foreground text-sm">
                 Query data • Preview changes • Execute with confidence
