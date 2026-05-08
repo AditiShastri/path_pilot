@@ -5,6 +5,7 @@ import { useEffect, useState } from "react"
 import {
   BadgeCheck,
   ChevronsUpDown,
+  Home,
   LogOut,
   Moon,
   Sparkles,
@@ -36,6 +37,8 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar'
 
+import { HomeLocationDialog } from "@/components/location/HomeLocationDialog"
+
 
 // Helper function to get user initials
 const getUserInitials = (name: string | undefined, email: string | undefined): string => {
@@ -65,6 +68,7 @@ export function NavUser({
   const router = useRouter()
   const isGuest = user.name === "Guest" && !user.email;
   const [isDark, setIsDark] = useState(false)
+  const [homeDialogOpen, setHomeDialogOpen] = useState(false)
 
   useEffect(() => {
     const updateTheme = () => {
@@ -138,6 +142,18 @@ export function NavUser({
                 <Sparkles />
                 AI chat
               </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  if (isGuest) {
+                    toast.error("Log in to save a home location.")
+                    return
+                  }
+                  setHomeDialogOpen(true)
+                }}
+              >
+                <Home className="size-4" />
+                Set home location
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={toggleTheme}>
                 {isDark ? <Moon className="size-4" /> : <Sun className="size-4" />}
                 {isDark ? "Dark" : "Light"} Theme
@@ -157,6 +173,7 @@ export function NavUser({
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>
+      <HomeLocationDialog open={homeDialogOpen} onOpenChange={setHomeDialogOpen} />
     </SidebarMenu>
   )
 }

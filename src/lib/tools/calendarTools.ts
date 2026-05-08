@@ -2,7 +2,7 @@ import "server-only";
 
 import { tool } from "ai";
 import { z } from "zod";
-import { getUpcomingEvents, CalendarNotConnectedError } from "@/lib/calendar/calendarService";
+import { getUpcomingEvents, createCalendarEvent, CalendarNotConnectedError } from "@/lib/calendar/calendarService";
 import { generateCommuteAdvice } from "@/lib/ai/commuteAdvice";
 import { debugLog } from "@/lib/debug/serverDebug";
 import { randomUUID } from "crypto";
@@ -84,8 +84,70 @@ export function createCalendarTools(options: { userId: string; baseUrl: string }
     },
   });
 
+  const createCalendarEventTool = tool({
+    description:
+      "Create a Google Calendar event for the authenticated user (primary calendar). Requires Google Calendar to be connected with write permissions.",
+    inputSchema: z.object({
+      title: z.string().min(1).describe("Event title/summary"),
+      startTime: z
+        .string()
+        .min(1)
+        .describe("Event start time in RFC3339, e.g. 2026-05-08T15:00:00-04:00"),
+      endTime: z
+        .string()
+        .min(1)
+        .describe("Event end time in RFC3339, e.g. 2026-05-08T16:00:00-04:00"),
+      timeZone: z
+        .string()
+        .optional()
+        .describe("Optional IANA timezone, e.g. America/New_York"),
+      location: z.string().optional().describe("Optional event location"),
+      description: z.string().optional().describe("Optional event description/notes"),
+      attendees: z
+        .array(z.string().min(3))
+        .optional()
+        .describe("Optional list of attendee emails"),
+    }),
+    execute: async (input) => {
+      const traceId = randomUUID();
+      debugLog("Tool create_calendar_event invoked", { traceId, userId: options.userId });
+
+      try {
+        const event = await createCalendarEvent(options.userId, input, { traceId });
+        debugLog("Tool create_calendar_event ok", { traceId, userId: options.userId, eventId: event.id });
+        return { connected: true, created: true, event };
+      } catch (e: any) {
+        if (e instanceof CalendarNotConnectedError) {
+          debugLog("Tool create_calendar_event not connected", { traceId, userId: options.userId });
+          return {
+            connected: false,
+            connectUrl,
+            created: false,
+            message: "Calendar is not connected. User must grant permission.",
+          };
+        }
+
+        const msg = typeof e?.message === "string" ? e.message : "";
+        const needsReauth = /insufficient|scope|forbidden|permission/i.test(msg);
+        if (needsReauth) {
+          debugLog("Tool create_calendar_event needs reauth", { traceId, userId: options.userId, message: msg });
+          return {
+            connected: false,
+            connectUrl,
+            created: false,
+            message:
+              "Calendar is connected but needs re-authorization with write permissions. Please reconnect Google Calendar.",
+          };
+        }
+
+        throw e;
+      }
+    },
+  });
+
   return {
     upcoming_events: upcomingEvents,
     commute_advice_next_event: commuteAdviceForNextEvent,
+    create_calendar_event: createCalendarEventTool,
   };
 }

@@ -1,4 +1,5 @@
 "use client";
+import { useLocationContext } from "@/hooks/useLocationContext";
 import { useMemo, useRef, useState, useEffect, useCallback } from "react";
 import type { UIMessage } from "ai";
 import { AppSidebar } from "../components/app-sidebar";
@@ -150,6 +151,7 @@ export default function Page() {
 
   const router = useRouter();
   const { user, loading } = useUserInfo();
+  const locationContext = useLocationContext();
   const { keys } = useKeyVault();
 
   const [mode, setMode] = useState<AIMode>("server-key");
@@ -664,6 +666,10 @@ export default function Page() {
     transport: new DefaultChatTransport({
       api: "/api/ai/chat",
       prepareSendMessagesRequest({ messages, id, body, trigger, messageId }) {
+        // Location context is optional; backend will also resolve home location when source=home.
+        const location = locationContext.effective
+          ? { source: locationContext.source, coords: locationContext.effective }
+          : { source: locationContext.source };
         return {
           body: {
             ...body,
@@ -671,6 +677,7 @@ export default function Page() {
             messages:messages.slice(-12),
             trigger,
             messageId,
+            location,
           },
         };
       },

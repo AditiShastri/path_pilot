@@ -2,7 +2,8 @@ import "server-only";
 
 import crypto from "crypto";
 
-export const CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.readonly";
+// Write access is required for creating calendar events.
+export const CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar";
 
 function requireEnv(name: string): string {
   const value = process.env[name];

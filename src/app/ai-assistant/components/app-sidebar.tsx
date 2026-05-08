@@ -4,6 +4,9 @@ import * as React from "react"
 import {
   Mic,
   MicOff,
+  Home,
+  MapPin,
+  Navigation,
   MoreHorizontal,
   SquarePen,
   PawPrint,
@@ -23,6 +26,11 @@ import { Separator } from "@/components/ui/separator"
 import { NavUser } from "@/components/nav-user"
 import { cn } from "@/lib/utils"
 import { useUserInfo } from "@/hooks/useUserInfo"
+import { useLocationContext } from "@/hooks/useLocationContext"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import { HomeLocationDialog } from "@/components/location/HomeLocationDialog"
+import { ManualLocationDialog } from "@/components/location/ManualLocationDialog"
+import { CurrentLocationDialog } from "@/components/location/CurrentLocationDialog"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -82,8 +90,12 @@ export function AppSidebar({
   const [editingId, setEditingId] = React.useState<string | null>(null)
   const [title, setTitle] = React.useState("")
   const { user } = useUserInfo();
+  const location = useLocationContext();
   const [calendarConnected, setCalendarConnected] = React.useState<boolean | null>(null);
   const [calendarConnectUrl, setCalendarConnectUrl] = React.useState<string>("/auth/google-calendar/connect");
+  const [homeDialogOpen, setHomeDialogOpen] = React.useState(false)
+  const [manualDialogOpen, setManualDialogOpen] = React.useState(false)
+  const [currentDialogOpen, setCurrentDialogOpen] = React.useState(false)
   const safeChats = Array.isArray(chats) ? chats : []
   const grouped = React.useMemo(() => groupChatsByDate(safeChats), [safeChats])
   const router = useRouter();
@@ -200,6 +212,78 @@ export function AppSidebar({
               Connect Calendar
             </Button>
           )}
+
+          <div className="px-3 pt-2 flex flex-col gap-2">
+            <div className="text-xs font-medium text-muted-foreground">Location</div>
+            <ToggleGroup
+              type="single"
+              value={location.source}
+              onValueChange={(value) => {
+                if (value !== "home" && value !== "current" && value !== "manual") return
+                location.setSource(value)
+                if (value === "home" && !location.home) setHomeDialogOpen(true)
+                if (value === "manual" && !location.manual) setManualDialogOpen(true)
+                if (value === "current") setCurrentDialogOpen(true)
+              }}
+              variant="outline"
+              size="sm"
+              className="w-full justify-between"
+            >
+              <ToggleGroupItem value="home" className="flex-1 justify-center gap-1">
+                <Home className="size-4" />
+                Home
+              </ToggleGroupItem>
+              <ToggleGroupItem value="current" className="flex-1 justify-center gap-1">
+                <Navigation className="size-4" />
+                Current
+              </ToggleGroupItem>
+              <ToggleGroupItem value="manual" className="flex-1 justify-center gap-1">
+                <MapPin className="size-4" />
+                Manual
+              </ToggleGroupItem>
+            </ToggleGroup>
+
+            <div className="text-xs text-muted-foreground">
+              {location.effective
+                ? `${location.effective.lat.toFixed(4)}, ${location.effective.lng.toFixed(4)}`
+                : location.source === "home"
+                  ? "Home not set"
+                  : location.source === "manual"
+                    ? "Manual not set"
+                    : "No current location yet"}
+            </div>
+
+            {location.source === "home" && (
+              <Button
+                variant="ghost"
+                className="justify-start gap-2"
+                onClick={() => setHomeDialogOpen(true)}
+              >
+                <Home className="size-4" />
+                Set home location
+              </Button>
+            )}
+            {location.source === "manual" && (
+              <Button
+                variant="ghost"
+                className="justify-start gap-2"
+                onClick={() => setManualDialogOpen(true)}
+              >
+                <MapPin className="size-4" />
+                Set manual location
+              </Button>
+            )}
+            {location.source === "current" && (
+              <Button
+                variant="ghost"
+                className="justify-start gap-2"
+                onClick={() => setCurrentDialogOpen(true)}
+              >
+                <Navigation className="size-4" />
+                Configure current location
+              </Button>
+            )}
+          </div>
         </div>
         <Separator className="mb-4" />
         
@@ -300,6 +384,10 @@ export function AppSidebar({
       <SidebarFooter className="border-t p-3">
       <NavUser user={userData} />
       </SidebarFooter>
+
+      <HomeLocationDialog open={homeDialogOpen} onOpenChange={setHomeDialogOpen} />
+      <ManualLocationDialog open={manualDialogOpen} onOpenChange={setManualDialogOpen} />
+      <CurrentLocationDialog open={currentDialogOpen} onOpenChange={setCurrentDialogOpen} />
     </Sidebar>
   )
 }

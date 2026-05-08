@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getGoogleCalendarClient, CalendarNotConnectedError } from "@/lib/google/calendarClient";
-import type { UpcomingCalendarEvent } from "@/lib/calendar/types";
+import type { UpcomingCalendarEvent, CreateCalendarEventInput, CreatedCalendarEvent } from "@/lib/calendar/types";
 import { debugLog } from "@/lib/debug/serverDebug";
 
 type GoogleCalendarEvent = {
@@ -112,6 +112,68 @@ export async function getUpcomingEvents(
     count: events.length,
   });
   return events;
+}
+
+type GoogleCalendarCreatedEvent = {
+  id?: string;
+  htmlLink?: string;
+  summary?: string;
+  location?: string;
+  start?: { dateTime?: string; date?: string };
+  end?: { dateTime?: string; date?: string };
+};
+
+export async function createCalendarEvent(
+  userId: string,
+  input: CreateCalendarEventInput,
+  debug?: { traceId?: string }
+): Promise<CreatedCalendarEvent> {
+  const traceId = debug?.traceId;
+
+  debugLog("createCalendarEvent start", {
+    traceId,
+    userId,
+    title: input.title,
+    hasLocation: Boolean((input.location ?? "").trim()),
+    hasAttendees: Array.isArray(input.attendees) ? input.attendees.length : 0,
+  });
+
+  const client = await getGoogleCalendarClient(userId);
+
+  const created = (await client.insertPrimaryEvent({
+    summary: input.title,
+    description: input.description,
+    location: input.location,
+    start: input.timeZone
+      ? { dateTime: input.startTime, timeZone: input.timeZone }
+      : { dateTime: input.startTime },
+    end: input.timeZone
+      ? { dateTime: input.endTime, timeZone: input.timeZone }
+      : { dateTime: input.endTime },
+    attendees: (input.attendees ?? []).map((email) => ({ email })),
+  })) as GoogleCalendarCreatedEvent;
+
+  if (!created?.id) {
+    throw new Error("Google Calendar API returned no event id");
+  }
+
+  const startTime = created.start?.dateTime ?? created.start?.date ?? input.startTime;
+  const endTime = created.end?.dateTime ?? created.end?.date ?? input.endTime;
+
+  debugLog("createCalendarEvent ok", {
+    traceId,
+    userId,
+    eventId: created.id,
+  });
+
+  return {
+    id: created.id,
+    htmlLink: created.htmlLink,
+    title: (created.summary ?? input.title).trim() || input.title,
+    startTime,
+    endTime,
+    location: (created.location ?? input.location)?.trim() || undefined,
+  };
 }
 
 export { CalendarNotConnectedError };

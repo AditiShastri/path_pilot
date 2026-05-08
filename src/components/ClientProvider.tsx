@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect } from "react";
 const queryClient = new QueryClient();
 import { UserProvider } from '@/hooks/useUserInfo';
+import { LocationProvider } from "@/hooks/useLocationContext";
 
 export default function ClientProviders({
   children,
@@ -24,9 +25,11 @@ export default function ClientProviders({
   return (
     <QueryClientProvider client={queryClient}>
       <UserProvider>
-        <main>
-          {children}
-        </main>
+        <LocationProvider>
+          <main>
+            {children}
+          </main>
+        </LocationProvider>
         <Toaster position="bottom-right" richColors closeButton />
       </UserProvider>
     </QueryClientProvider>

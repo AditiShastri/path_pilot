@@ -114,6 +114,14 @@ export type GoogleCalendarClient = {
     timeMax: string;
     maxResults?: number;
   }) => Promise<any>;
+  insertPrimaryEvent: (event: {
+    summary: string;
+    description?: string;
+    location?: string;
+    start: { dateTime: string; timeZone?: string };
+    end: { dateTime: string; timeZone?: string };
+    attendees?: Array<{ email: string }>;
+  }) => Promise<any>;
 };
 
 export async function getGoogleCalendarClient(userId: string): Promise<GoogleCalendarClient> {
@@ -160,6 +168,54 @@ export async function getGoogleCalendarClient(userId: string): Promise<GoogleCal
         userId,
         status: res.status,
         items: Array.isArray(json?.items) ? json.items.length : null,
+      });
+
+      return json;
+    },
+
+    async insertPrimaryEvent(event) {
+      const url = new URL("https://www.googleapis.com/calendar/v3/calendars/primary/events");
+
+      debugLog("Calling Google Calendar API", {
+        userId,
+        calendarId: "primary",
+        method: "POST",
+        hasLocation: Boolean((event.location ?? "").trim()),
+        hasAttendees: Array.isArray(event.attendees) ? event.attendees.length : 0,
+      });
+
+      const res = await fetch(url.toString(), {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          summary: event.summary,
+          description: event.description,
+          location: event.location,
+          start: event.start,
+          end: event.end,
+          attendees: event.attendees,
+        }),
+        cache: "no-store",
+      });
+
+      const json = (await res.json()) as any;
+      if (!res.ok) {
+        debugLog("Google Calendar API error", {
+          userId,
+          status: res.status,
+          statusText: res.statusText,
+          message: json?.error?.message ?? null,
+        });
+        throw new Error(`Google Calendar API error (${res.status}): ${json?.error?.message ?? res.statusText}`);
+      }
+
+      debugLog("Google Calendar API ok", {
+        userId,
+        status: res.status,
+        eventId: json?.id ?? null,
       });
 
       return json;

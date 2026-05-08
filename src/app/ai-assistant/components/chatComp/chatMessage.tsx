@@ -122,7 +122,11 @@ export const ChatMessage = memo(function ChatMessage({
     const connected = typeof output.connected === "boolean" ? output.connected : null;
 
     if (
-      (toolType === "tool-upcoming_events" || toolType === "tool-commute_advice_next_event") &&
+      (
+        toolType === "tool-upcoming_events" ||
+        toolType === "tool-commute_advice_next_event" ||
+        toolType === "tool-create_calendar_event"
+      ) &&
       connected === false &&
       connectUrl
     ) {
