@@ -13,6 +13,8 @@ import {
   executeWriteSqlTool,
   previewWriteSqlTool,
 } from "@/lib/tools/writeSqlTool";
+import { telegramTool } from "@/lib/tools/telegramTool";
+import { commutePlanTool } from "@/lib/tools/commutePlanTool";
 import { errorDecoder } from "@/lib/ai/decodeError";
 
 export async function POST(req: Request) {
@@ -32,7 +34,15 @@ export async function POST(req: Request) {
         }
       );
     }
-  const { messages, mode, modelId, userApiKey, voiceAssistantEnabled } = await req.json();
+
+    const {
+      messages,
+      mode,
+      modelId,
+      userApiKey,
+      voiceAssistantEnabled,
+      telegramChatId,
+    } = await req.json();
 
   const model = resolveModel({ mode, model: modelId, userApiKey });
   
@@ -47,12 +57,34 @@ export async function POST(req: Request) {
       model,
       system: voiceAssistantEnabled ? VOICE_ASSISTANT_SYSTEM_PROMPT : SYSTEM_PROMPT,
       messages: prunedMessages,
-      tools: { 
+      tools: {
         read_sql: readSqlTool,
         schema_info: schemaInfoTool,
         present_data: presentDataTool,
         execute_preview_write_sql: previewWriteSqlTool,
         execute_write_sql: executeWriteSqlTool,
+        commute_plan: commutePlanTool,
+        send_telegram: {
+          ...telegramTool,
+          execute: async (toolInput: any) => {
+            // If the model didn't provide chat_id, fall back to the client-provided one.
+            const chat_id = toolInput?.chat_id ?? telegramChatId;
+
+            // Make the telegram chat id visible whenever the tool is called.
+            console.log("[send_telegram] tool called with chat_id:", chat_id);
+
+            if (!chat_id) {
+              throw new Error(
+                "Missing telegram chat id. Connect via the button / set localStorage.",
+              );
+            }
+
+            return telegramTool.execute({
+              chat_id,
+              text: toolInput?.text,
+            });
+          },
+        },
       },
       toolChoice: "auto",
       // Stop after 10 steps

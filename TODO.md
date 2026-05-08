@@ -1,0 +1,3 @@
+- [ ] Update `src/app/ai-assistant/[id]/page.tsx` to persist last opened chat id in `localStorage`
+- [ ] Update `src/app/ai-assistant/[id]/page.tsx` to auto-redirect when route param is `new`
+- [ ] Quick sanity check by running Next dev server and navigating between chats

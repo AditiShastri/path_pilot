@@ -17,13 +17,16 @@ export function parseModelValue(value: string): {
   provider: Provider;
   model: string;
 } {
-  const firstSlash = value.indexOf("/");
+  // Default to Gemini if value is undefined or empty
+  const modelValue = value || "google/gemini-2.5-flash";
+  
+  const firstSlash = modelValue.indexOf("/");
   if (firstSlash === -1) {
-    throw new Error(`Invalid model value: ${value}`);
+    throw new Error(`Invalid model value: ${modelValue}`);
   }
 
-  const provider = value.slice(0, firstSlash) as Provider;
-  const model = value.slice(firstSlash + 1);
+  const provider = modelValue.slice(0, firstSlash) as Provider;
+  const model = modelValue.slice(firstSlash + 1);
 
   return { provider, model };
 }

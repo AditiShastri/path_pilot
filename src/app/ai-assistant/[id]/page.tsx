@@ -4,6 +4,7 @@ import type { UIMessage } from "ai";
 import { AppSidebar } from "../components/app-sidebar";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { TelegramConnect } from "@/components/ui/TelegramConnect";
 import {
   SidebarInset,
   SidebarProvider,
@@ -93,6 +94,9 @@ function removeToolResults(messages: UIMessage[]) {
 
 const VOICE_ASSISTANT_STORAGE_PREFIX = "voice-assistant-chat:";
 
+// Stores the most recently opened chat id so we don't need to pass it around manually.
+const LAST_CHAT_ID_STORAGE_KEY = "pixie:lastChatId";
+
 function getVoiceAssistantStorageKey(chatId: string) {
   return `${VOICE_ASSISTANT_STORAGE_PREFIX}${chatId}`;
 }
@@ -159,7 +163,7 @@ export default function Page() {
   const { keys } = useKeyVault();
 
   const [mode, setMode] = useState<AIMode>("server-key");
-  const [selectedModel, setSelectedModel] = useState("openai/gpt-5.4-mini");
+  const [selectedModel, setSelectedModel] = useState("google/gemini-2.5-flash");
   const [chatList, setChatList] = useState<any[]>([]);
   const [input, setInput] = useState("");
   const [isRegenerating, setIsRegenerating] = useState(false);
@@ -638,6 +642,21 @@ export default function Page() {
     }
   }, [stopSpeechPlayback, voiceAssistantEnabled]);
 
+  // If user lands on /ai-assistant/new, auto-redirect to the last opened chat.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (chatId !== "new") return;
+
+    try {
+      const lastChatId = localStorage.getItem(LAST_CHAT_ID_STORAGE_KEY);
+      if (!lastChatId || lastChatId === "new") return;
+
+      router.replace(`/ai-assistant/${lastChatId}`);
+    } catch {
+      // ignore storage read errors
+    }
+  }, [chatId, router]);
+
   useEffect(() => {
     stopSpeechPlayback();
     spokenCursorByMessageRef.current = {};
@@ -867,6 +886,11 @@ export default function Page() {
     const { provider } = parseModelValue(selectedModel);
     const userApiKey = keys[provider];
 
+    const telegramChatId =
+      typeof window !== "undefined"
+        ? localStorage.getItem("telegramChatId")
+        : null;
+
     sendMessage(
       { text },
       {
@@ -876,6 +900,7 @@ export default function Page() {
           userApiKey,
           chatId,
           voiceAssistantEnabled: effectiveVoiceAssistantEnabled,
+          telegramChatId,
         },
       },
     );
@@ -1020,6 +1045,13 @@ export default function Page() {
 
   function openChat(id: string) {
     if (id === chatId) return;
+
+    try {
+      localStorage.setItem(LAST_CHAT_ID_STORAGE_KEY, id);
+    } catch {
+      // ignore storage write errors (e.g. blocked cookies)
+    }
+
     router.push(`/ai-assistant/${id}`);
   }
 
@@ -1186,6 +1218,10 @@ export default function Page() {
       {showHeader ? (
         renderHeaderContent()
       ) : null}
+
+      <div className="border-b px-4 py-3">
+        <TelegramConnect />
+      </div>
 
       <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
         <ChatTimeline

@@ -21,6 +21,8 @@ You MUST decide intelligently which tool to use.
 - present_data → displays tabular or markdown-formatted data in the chat UI
 - execute_preview_write_sql → safely previews INSERT/UPDATE/DELETE/UPSERT in a rollback transaction
 - execute_write_sql → commits a previously previewed write operation by preview_id
+- commute_plan → plans mock commutes, mode choice, schedule conflicts, mock event creation, and mock cab/auto/metro bookings
+- send_telegram → sends a Telegram message to a specific chat ID
 
 ---
 
@@ -92,6 +94,34 @@ Use when:
 - Do NOT call schema_info or read_sql
 - Answer directly from reliable internal knowledge
 - If real-time or external verification is required, clearly state that live web search is currently unavailable
+
+---
+
+## MODE 3A - SMART CALENDAR COMMUTE MODE
+
+Use when:
+- User asks about going to a destination
+- User asks how long travel will take
+- User asks for the best mode of travel
+- User asks whether a trip conflicts with meetings
+- User asks to create/schedule a mock event
+- User asks to mock book a cab, auto, or metro
+- User mentions mock destinations such as MG Road or Electronic City
+
+### Mandatory Flow:
+1. Call \`commute_plan\`
+2. Use the tool result to answer with:
+   - destination and matched event, if any
+   - recommended mode and travel time
+   - leave-by time when a meeting/event time is known
+   - conflicts, if any
+   - booking or mock event status, if requested
+
+### Hard Rules:
+- Do NOT call database tools for commute mock questions
+- Do NOT claim a real cab/auto/metro/calendar booking was made
+- Clearly say mock booking or mock event when the user asks to book/create
+- If the destination is not in mock data, tell the user the known mock destinations
 
 ---
 
@@ -170,6 +200,9 @@ Example:
 IF query is about database:
   → if read-only: schema_info → read_sql
   → if write/change request: schema_info → execute_preview_write_sql → wait for confirmation → execute_write_sql
+
+ELSE IF query is about commute, route, travel mode, meeting conflict, mock event creation, or mock cab/auto/metro booking:
+  → commute_plan
 
 ELSE:
   → answer directly (no tools)
@@ -258,6 +291,7 @@ If the result is long, tabular, or hard to speak:
 - present_data → displays tabular or markdown-formatted data in the chat UI
 - execute_preview_write_sql → safely previews INSERT/UPDATE/DELETE/UPSERT
 - execute_write_sql → commits a previously previewed write
+- commute_plan → plans mock commutes, mode choice, conflicts, mock events, and mock cab/auto/metro bookings
 
 ---
 
@@ -286,6 +320,14 @@ Rules:
 - Require explicit user confirmation before commit
 - No multi-statement SQL
 - If preview fails, explain briefly and retry
+
+## Smart Calendar Commute
+Flow: commute_plan
+
+Rules:
+- Use for destination, travel time, best mode, conflict, mock event, or mock booking questions
+- Keep the spoken answer short: best mode, time, leave-by time, and conflict/booking status
+- Say "mock" for any booking or event creation
 
 ## General Knowledge
 - Answer directly

@@ -6,7 +6,7 @@ import {
   ChainOfThoughtStep,
   ChainOfThoughtTrigger,
 } from "@/components/ui/chain-of-thought";
-import { Database, Eye, Globe, Loader2, Network, PenLine, Presentation, Wrench } from "lucide-react";
+import { CalendarClock, Database, Eye, Globe, Loader2, Network, PenLine, Presentation, Wrench } from "lucide-react";
 
 function getToolVisual(toolType: string) {
   const normalizedType = toolType.replace(/^tool-/, "");
@@ -41,6 +41,10 @@ function getToolVisual(toolType: string) {
     present_data: {
       Icon: Presentation,
       iconClassName: "text-primary",
+    },
+    commute_plan: {
+      Icon: CalendarClock,
+      iconClassName: "text-indigo-500",
     },
   };
 
@@ -79,6 +83,10 @@ function getToolSummary(toolType: string) {
     present_data: {
       title: "Presenting data",
       description: "Formatting data for on-screen display instead of speech.",
+    },
+    commute_plan: {
+      title: "Planning commute",
+      description: "Checking mock events, routes, travel modes, conflicts, and bookings.",
     },
   };
 
