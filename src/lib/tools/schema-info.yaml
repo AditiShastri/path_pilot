@@ -1,0 +1,36 @@
+schema_info:
+  version: 0
+  format: yaml
+
+tables:
+
+  example: Test
+  pk: Col1
+  
+      
+display_rules:
+
+  column_name_format:
+    remove_underscores: true
+    case: title_case
+
+  date_format:
+    output_format: "MM/DD/YYYY"
+    sql_transformation: |
+      Use TO_CHAR(date_column, 'MM/DD/YYYY')
+
+  examples:
+    - "delivery_date → 04/03/2026"
+    - "retirement_date → 12/31/2030"
+
+  sql_enforcement:
+    require_alias: true
+    alias_format: double_quotes
+    transformation_rules:
+      - Replace underscores with spaces and convert to Title Case
+      - Format date columns using TO_CHAR
+
+  constraints:
+    - never_return_raw_column_names
+    - always_format_dates_in_select
+    - always_apply_column_formatting
